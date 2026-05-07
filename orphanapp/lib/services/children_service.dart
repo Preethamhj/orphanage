@@ -8,7 +8,9 @@ class ChildrenService {
     final trimmed = query.trim();
     final isNumeric = int.tryParse(trimmed) != null;
 
-    var req = SupabaseService.client.from('children').select();
+    var req = SupabaseService.client
+        .from('children')
+        .select('*, child_skills(*)');
     if (trimmed.isNotEmpty) {
       if (isNumeric) {
         req = req.eq('child_id', int.parse(trimmed));
@@ -22,37 +24,49 @@ class ChildrenService {
         .from('adoptions')
         .select('child_id')
         .eq('approval_status', 'approved');
-    final approvedIds = approvedRows.map((e) => (e['child_id'] as num).toInt()).toSet();
+    final approvedIds = approvedRows
+        .map((e) => (e['child_id'] as num).toInt())
+        .toSet();
 
     final models = data
         .map((e) => ChildModel.fromJson(Map<String, dynamic>.from(e as Map)))
         .where((c) => c.childId == null || !approvedIds.contains(c.childId))
         .toList();
 
-    await CacheStore.writeJson('cache_children_list', models.map((e) => e.toJson()).toList());
+    await CacheStore.writeJson(
+      'cache_children_list',
+      models.map((e) => e.toJson(includeSkills: true)).toList(),
+    );
     return models;
   }
 
   Future<void> create(ChildModel model) async {
-    if (!RoleManager.instance.canModifyChildren()) throw Exception('Access denied');
-    await SupabaseService.client.from('children').insert(model.toJson()..remove('child_id'));
+    if (!RoleManager.instance.canModifyChildren())
+      throw Exception('Access denied');
+    final payload = model.toJson(includeSkills: false)
+      ..remove('child_id')
+      ..remove('child_skills');
+    await SupabaseService.client.from('children').insert(payload);
   }
 
   Future<void> update(ChildModel model) async {
-    if (!RoleManager.instance.canModifyChildren()) throw Exception('Access denied');
-    await SupabaseService.client.from('children').update({
-      'name': model.name,
-      'age': model.age,
-      'gender': model.gender,
-      'education': model.education,
-      'health_status': model.healthStatus,
-      'admission_date': model.toJson()['admission_date'],
-      'guardian_details': model.guardianDetails,
-    }).eq('child_id', model.childId!);
+    if (!RoleManager.instance.canModifyChildren())
+      throw Exception('Access denied');
+    final payload = model.toJson(includeSkills: false)
+      ..remove('child_id')
+      ..remove('child_skills');
+    await SupabaseService.client
+        .from('children')
+        .update(payload)
+        .eq('child_id', model.childId!);
   }
 
   Future<void> delete(int childId) async {
-    if (!RoleManager.instance.canModifyChildren()) throw Exception('Access denied');
-    await SupabaseService.client.from('children').delete().eq('child_id', childId);
+    if (!RoleManager.instance.canModifyChildren())
+      throw Exception('Access denied');
+    await SupabaseService.client
+        .from('children')
+        .delete()
+        .eq('child_id', childId);
   }
 }

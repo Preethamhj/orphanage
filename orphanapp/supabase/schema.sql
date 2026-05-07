@@ -36,7 +36,27 @@ create table if not exists public.children (
   education text not null,
   health_status text not null,
   admission_date date not null,
-  guardian_details text
+  guardian_details text,
+  dob date,
+  class integer,
+  section text,
+  school_name text
+);
+
+alter table public.children add column if not exists dob date;
+alter table public.children add column if not exists class integer;
+alter table public.children add column if not exists section text;
+alter table public.children add column if not exists school_name text;
+
+create table if not exists public.academic_records (
+  id uuid primary key default gen_random_uuid(),
+  child_id bigint not null references public.children(child_id) on delete cascade,
+  class integer not null,
+  year integer not null,
+  marks numeric(5,2) not null check (marks >= 0 and marks <= 100),
+  attendance numeric(5,2) not null check (attendance >= 0 and attendance <= 100),
+  performance_level text not null check (performance_level in ('Excellent','Good','Average','Poor')),
+  created_at timestamptz not null default now()
 );
 
 create table if not exists public.staff (
@@ -55,8 +75,13 @@ create table if not exists public.donors (
   full_name text not null,
   email text not null unique,
   contact_number text,
+  occupation text,
+  monthly_salary numeric(12,2),
   created_at timestamptz not null default now()
 );
+
+alter table public.donors add column if not exists occupation text;
+alter table public.donors add column if not exists monthly_salary numeric(12,2);
 
 create table if not exists public.adopters (
   adopter_id bigint generated always as identity primary key,
@@ -77,6 +102,17 @@ create table if not exists public.donations (
   remarks text
 );
 
+create table if not exists public.donars (
+  donation_id bigint generated always as identity primary key,
+  donor_name text not null,
+  donation_type text not null check (donation_type in ('cash','clothes','food','others')),
+  donation_amount numeric(12,2) not null default 0,
+  payment_method text not null,
+  donation_date date not null,
+  remarks text,
+  updated_at timestamptz default now()
+);
+
 create table if not exists public.adoptions (
   adoption_id bigint generated always as identity primary key,
   child_id bigint not null references public.children(child_id) on delete restrict,
@@ -88,6 +124,9 @@ create table if not exists public.adoptions (
 );
 
 create index if not exists idx_children_name on public.children(name);
+create index if not exists idx_children_class on public.children(class);
+create index if not exists idx_academic_records_child on public.academic_records(child_id);
+create index if not exists idx_academic_records_class_year on public.academic_records(class, year);
 create index if not exists idx_staff_name on public.staff(name);
 create index if not exists idx_donors_email on public.donors(email);
 create index if not exists idx_adopters_email on public.adopters(email);
@@ -181,8 +220,10 @@ for each row execute procedure public.handle_new_user();
 
 -- RLS
 alter table public.children enable row level security;
+alter table public.academic_records enable row level security;
 alter table public.staff enable row level security;
 alter table public.donations enable row level security;
+alter table public.donars enable row level security;
 alter table public.adoptions enable row level security;
 alter table public.users enable row level security;
 alter table public.login_logs enable row level security;
@@ -193,6 +234,12 @@ alter table public.admin_users enable row level security;
 -- Existing tables: authenticated CRUD
 drop policy if exists children_auth_all on public.children;
 create policy children_auth_all on public.children
+for all to authenticated
+using (true)
+with check (true);
+
+drop policy if exists academic_records_auth_all on public.academic_records;
+create policy academic_records_auth_all on public.academic_records
 for all to authenticated
 using (true)
 with check (true);
@@ -223,6 +270,12 @@ with check (true);
 
 drop policy if exists donations_auth_all on public.donations;
 create policy donations_auth_all on public.donations
+for all to authenticated
+using (true)
+with check (true);
+
+drop policy if exists donars_auth_all on public.donars;
+create policy donars_auth_all on public.donars
 for all to authenticated
 using (true)
 with check (true);

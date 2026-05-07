@@ -16,8 +16,11 @@ import 'screens/common/access_denied_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/donations/donation_screen.dart';
 import 'screens/donor/donor_dashboard_screen.dart';
+import 'screens/grouping_screen.dart';
 import 'screens/profile/admin_profile_page.dart';
 import 'screens/role_home/role_home_screen.dart';
+import 'screens/student_category_dashboard.dart';
+import 'screens/skills_management_screen.dart';
 import 'screens/staff/staff_screen.dart';
 
 Future<void> main() async {
@@ -39,7 +42,10 @@ Future<void> main() async {
   await AppLogger.instance.log('app_start');
 
   if (AppConfig.isConfigured) {
-    await Supabase.initialize(url: AppConfig.supabaseUrl, anonKey: AppConfig.supabaseAnonKey);
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
+    );
     await AppLogger.instance.log('supabase_initialized');
     final currentUser = Supabase.instance.client.auth.currentUser;
     if (currentUser != null) {
@@ -49,18 +55,30 @@ Future<void> main() async {
             .select('role, approval_status')
             .eq('id', currentUser.id)
             .maybeSingle();
-        final role = ((row?['role'] as String?) ?? 'staff').toLowerCase().trim();
+        final role = ((row?['role'] as String?) ?? 'staff')
+            .toLowerCase()
+            .trim();
         final approval = (row?['approval_status'] as String?) ?? 'pending';
         if (role != 'admin' && approval != 'approved') {
           await Supabase.instance.client.auth.signOut();
           RoleManager.instance.setRole(null);
           await AppLogger.instance.log(
             'session_blocked_pending_approval',
-            details: {'user_id': currentUser.id, 'role': role, 'approval_status': approval},
+            details: {
+              'user_id': currentUser.id,
+              'role': role,
+              'approval_status': approval,
+            },
           );
         } else {
           RoleManager.instance.setRole(role);
-          await AppLogger.instance.log('session_role_loaded', details: {'user_id': currentUser.id, 'role': RoleManager.instance.role});
+          await AppLogger.instance.log(
+            'session_role_loaded',
+            details: {
+              'user_id': currentUser.id,
+              'role': RoleManager.instance.role,
+            },
+          );
         }
       } catch (_) {
         await Supabase.instance.client.auth.signOut();
@@ -81,7 +99,11 @@ class OrphanageApp extends StatelessWidget {
   bool _isAuthenticated() {
     if (RoleManager.instance.localAdminAuthenticated) return true;
     if (!AppConfig.isConfigured) return false;
-    return Supabase.instance.client.auth.currentSession != null;
+    try {
+      return Supabase.instance.client.auth.currentSession != null;
+    } catch (_) {
+      return false;
+    }
   }
 
   Route<dynamic> _guardedRoute(
@@ -112,10 +134,7 @@ class OrphanageApp extends StatelessWidget {
         return RoleHomeScreen(
           title: 'Staff Home',
           description: 'Staff access: view children and staff.',
-          actions: [
-            ('Children', '/children'),
-            ('Staff', '/staff'),
-          ],
+          actions: [('Children', '/children'), ('Staff', '/staff')],
         );
       case 'donor':
         return const DonorDashboardScreen();
@@ -123,10 +142,7 @@ class OrphanageApp extends StatelessWidget {
         return RoleHomeScreen(
           title: 'Adopter Home',
           description: 'Adopter access: apply and track adoption status.',
-          actions: [
-            ('Children', '/children'),
-            ('Adoptions', '/adoptions'),
-          ],
+          actions: [('Children', '/children'), ('Adoptions', '/adoptions')],
         );
       default:
         return const DashboardScreen();
@@ -138,8 +154,8 @@ class OrphanageApp extends StatelessWidget {
     final initialScreen = !AppConfig.isConfigured
         ? const _ConfigHelpScreen()
         : (_isAuthenticated()
-            ? _homeByRole(RoleManager.instance.role)
-            : const LoginScreen());
+              ? _homeByRole(RoleManager.instance.role)
+              : const LoginScreen());
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -151,34 +167,65 @@ class OrphanageApp extends StatelessWidget {
           case '/login':
             return _guardedRoute(const LoginScreen(), requiresAuth: false);
           case '/dashboard':
-            return _guardedRoute(const DashboardScreen(), allowedRoles: ['admin']);
+            return _guardedRoute(
+              const DashboardScreen(),
+              allowedRoles: ['admin'],
+            );
           case '/children':
-            return _guardedRoute(const ChildrenScreen(), allowedRoles: ['admin', 'staff', 'donor', 'adopter']);
+            return _guardedRoute(
+              const ChildrenScreen(),
+              allowedRoles: ['admin', 'staff', 'donor', 'adopter'],
+            );
           case '/staff':
-            return _guardedRoute(const StaffScreen(), allowedRoles: ['admin', 'staff', 'donor', 'adopter']);
+            return _guardedRoute(
+              const StaffScreen(),
+              allowedRoles: ['admin', 'staff', 'donor', 'adopter'],
+            );
           case '/donations':
-            return _guardedRoute(const DonationScreen(), allowedRoles: ['admin']);
+            return _guardedRoute(
+              const DonationScreen(),
+              allowedRoles: ['admin'],
+            );
           case '/adoptions':
-            return _guardedRoute(const AdoptionScreen(), allowedRoles: ['admin', 'adopter']);
+            return _guardedRoute(
+              const AdoptionScreen(),
+              allowedRoles: ['admin', 'adopter'],
+            );
+          case '/grouping':
+            return _guardedRoute(
+              const GroupingScreen(),
+              allowedRoles: ['admin', 'staff'],
+            );
+          case '/student-categories':
+            return _guardedRoute(
+              const StudentCategoryDashboard(),
+              allowedRoles: ['admin', 'staff'],
+            );
+          case '/skills-management':
+            return _guardedRoute(
+              const SkillsManagementScreen(),
+              allowedRoles: ['admin', 'staff'],
+            );
           case '/staff-home':
             return _guardedRoute(
               RoleHomeScreen(
                 title: 'Staff Home',
                 description: 'Staff access: children and staff summaries.',
-                actions: [
-                  ('Children', '/children'),
-                  ('Staff', '/staff'),
-                ],
+                actions: [('Children', '/children'), ('Staff', '/staff')],
               ),
               allowedRoles: ['staff'],
             );
           case '/donor-home':
-            return _guardedRoute(const DonorDashboardScreen(), allowedRoles: ['donor']);
+            return _guardedRoute(
+              const DonorDashboardScreen(),
+              allowedRoles: ['donor'],
+            );
           case '/adopter-home':
             return _guardedRoute(
               RoleHomeScreen(
                 title: 'Adopter Home',
-                description: 'Track your application and view children information.',
+                description:
+                    'Track your application and view children information.',
                 actions: [
                   ('Children', '/children'),
                   ('Adoptions', '/adoptions'),
@@ -209,7 +256,9 @@ class _ConfigHelpScreen extends StatelessWidget {
           children: [
             const Text('Run with dart-defines:'),
             const SizedBox(height: 8),
-            const SelectableText('flutter run --dart-define=SUPABASE_URL=YOUR_URL --dart-define=SUPABASE_ANON_KEY=YOUR_KEY'),
+            const SelectableText(
+              'flutter run --dart-define=SUPABASE_URL=YOUR_URL --dart-define=SUPABASE_ANON_KEY=YOUR_KEY',
+            ),
             const SizedBox(height: 16),
             const Text('Supabase SQL Schema (copy into SQL editor):'),
             const SizedBox(height: 8),

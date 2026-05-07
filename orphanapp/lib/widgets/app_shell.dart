@@ -72,6 +72,8 @@ class AppShell extends StatelessWidget {
               ),
               _item(context, 'Home', RoleManager.instance.homeRoute(), Icons.dashboard_outlined),
               _item(context, 'Children', '/children', Icons.child_care_outlined),
+              if (isAdmin || role == 'staff') _item(context, 'Student Groups', '/grouping', Icons.school_outlined),
+              if (isAdmin || role == 'staff') _item(context, 'Student Skills', '/skills-management', Icons.auto_awesome),
               _item(context, 'Staff', '/staff', Icons.badge_outlined),
               if (isAdmin) _item(context, 'Donations', '/donations', Icons.volunteer_activism_outlined),
               if (isAdmin || role == 'adopter') _item(context, 'Adoptions', '/adoptions', Icons.favorite_border),

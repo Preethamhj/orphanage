@@ -8,6 +8,7 @@ import '../../widgets/app_shell.dart';
 import '../../widgets/last_synced_label.dart';
 import '../../widgets/messages.dart';
 import '../../widgets/sync_status_icon.dart';
+import '../student_profile_screen.dart';
 
 class ChildrenScreen extends StatefulWidget {
   const ChildrenScreen({super.key});
@@ -38,14 +39,22 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
         showMessage(context, 'No records found', error: true);
       }
     } catch (e) {
-      if (mounted) showMessage(context, e.toString().replaceFirst('Exception: ', ''), error: true);
+      if (mounted)
+        showMessage(
+          context,
+          e.toString().replaceFirst('Exception: ', ''),
+          error: true,
+        );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _openForm([ChildModel? model]) async {
-    final result = await showDialog<ChildModel>(context: context, builder: (_) => _ChildFormDialog(model: model));
+    final result = await showDialog<ChildModel>(
+      context: context,
+      builder: (_) => _ChildFormDialog(model: model),
+    );
     if (result == null) return;
     try {
       if (model == null) {
@@ -58,7 +67,11 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      showMessage(context, e.toString().replaceFirst('Exception: ', ''), error: true);
+      showMessage(
+        context,
+        e.toString().replaceFirst('Exception: ', ''),
+        error: true,
+      );
     }
   }
 
@@ -81,12 +94,18 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
               final compact = constraints.maxWidth < 560;
               final searchField = TextField(
                 controller: _searchCtrl,
-                decoration: const InputDecoration(labelText: 'Search by name or ID'),
+                decoration: const InputDecoration(
+                  labelText: 'Search by name or ID',
+                ),
                 onSubmitted: (_) => _load(),
               );
               final actions = [
                 ElevatedButton(onPressed: _load, child: const Text('Search')),
-                if (canModify) ElevatedButton(onPressed: () => _openForm(), child: const Text('Add')),
+                if (canModify)
+                  ElevatedButton(
+                    onPressed: () => _openForm(),
+                    child: const Text('Add'),
+                  ),
               ];
               if (compact) {
                 return Column(
@@ -127,17 +146,43 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
                       return Card(
                         child: ListTile(
                           title: Text('${c.name} (#${c.childId})'),
-                          subtitle: Text('Age: ${c.age} | ${c.gender} | ${c.education}'),
-                          trailing: Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                            SyncStatusIcon(syncStatus: c.syncStatus),
-                            if (canModify) IconButton(onPressed: () => _openForm(c), icon: const Icon(Icons.edit)),
-                            if (canModify) IconButton(onPressed: () => _delete(c.childId!), icon: const Icon(Icons.delete, color: Colors.red)),
-                          ]),
+                          subtitle: Text(
+                            'Age: ${c.currentAge} | Class: ${c.schoolClass ?? '-'} | ${c.gender} | ${c.education}',
+                          ),
+                          onTap: c.childId == null
+                              ? null
+                              : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        StudentProfileScreen(child: c),
+                                  ),
+                                ),
+                          trailing: Wrap(
+                            spacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              SyncStatusIcon(syncStatus: c.syncStatus),
+                              if (canModify)
+                                IconButton(
+                                  onPressed: () => _openForm(c),
+                                  icon: const Icon(Icons.edit),
+                                ),
+                              if (canModify)
+                                IconButton(
+                                  onPressed: () => _delete(c.childId!),
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       );
                     },
                   ),
-          )
+          ),
         ],
       ),
     );
@@ -160,7 +205,11 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
   late final TextEditingController _education;
   late final TextEditingController _health;
   late final TextEditingController _guardian;
+  late final TextEditingController _classCtrl;
+  late final TextEditingController _section;
+  late final TextEditingController _schoolName;
   DateTime _admissionDate = DateTime.now();
+  DateTime? _dob;
 
   @override
   void initState() {
@@ -172,7 +221,11 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
     _education = TextEditingController(text: m?.education ?? '');
     _health = TextEditingController(text: m?.healthStatus ?? '');
     _guardian = TextEditingController(text: m?.guardianDetails ?? '');
+    _classCtrl = TextEditingController(text: m?.schoolClass?.toString() ?? '');
+    _section = TextEditingController(text: m?.section ?? '');
+    _schoolName = TextEditingController(text: m?.schoolName ?? '');
     _admissionDate = m?.admissionDate ?? DateTime.now();
+    _dob = m?.dob;
   }
 
   @override
@@ -184,36 +237,110 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
           key: _formKey,
           child: SizedBox(
             width: 360,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextFormField(controller: _name, decoration: const InputDecoration(labelText: 'Name'), validator: _required),
-              const SizedBox(height: 8),
-              TextFormField(controller: _age, decoration: const InputDecoration(labelText: 'Age'), keyboardType: TextInputType.number, validator: _required),
-              const SizedBox(height: 8),
-              TextFormField(controller: _gender, decoration: const InputDecoration(labelText: 'Gender'), validator: _required),
-              const SizedBox(height: 8),
-              TextFormField(controller: _education, decoration: const InputDecoration(labelText: 'Education'), validator: _required),
-              const SizedBox(height: 8),
-              TextFormField(controller: _health, decoration: const InputDecoration(labelText: 'Health Status'), validator: _required),
-              const SizedBox(height: 8),
-              TextFormField(controller: _guardian, decoration: const InputDecoration(labelText: 'Guardian Details (Optional)')),
-              const SizedBox(height: 8),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('Admission: ${_admissionDate.toLocal().toString().split(' ').first}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.calendar_today),
-                  onPressed: () async {
-                    final picked = await showDatePicker(context: context, initialDate: _admissionDate, firstDate: DateTime(2000), lastDate: DateTime(2100));
-                    if (picked != null) setState(() => _admissionDate = picked);
-                  },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _name,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: _required,
                 ),
-              )
-            ]),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _age,
+                  decoration: const InputDecoration(labelText: 'Age'),
+                  keyboardType: TextInputType.number,
+                  validator: _required,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _gender,
+                  decoration: const InputDecoration(labelText: 'Gender'),
+                  validator: _required,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _education,
+                  decoration: const InputDecoration(labelText: 'Education'),
+                  validator: _required,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _classCtrl,
+                  decoration: const InputDecoration(labelText: 'Class'),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _section,
+                  decoration: const InputDecoration(labelText: 'Section'),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _schoolName,
+                  decoration: const InputDecoration(labelText: 'School Name'),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _health,
+                  decoration: const InputDecoration(labelText: 'Health Status'),
+                  validator: _required,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _guardian,
+                  decoration: const InputDecoration(
+                    labelText: 'Guardian Details (Optional)',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'DOB: ${_dob?.toLocal().toString().split(' ').first ?? '-'}',
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.cake_outlined),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _dob ?? DateTime(DateTime.now().year - 10),
+                        firstDate: DateTime(1990),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) setState(() => _dob = picked);
+                    },
+                  ),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Admission: ${_admissionDate.toLocal().toString().split(' ').first}',
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.calendar_today),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _admissionDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null)
+                        setState(() => _admissionDate = picked);
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
         ElevatedButton(
           onPressed: () {
             if (!_formKey.currentState!.validate()) return;
@@ -227,15 +354,28 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
                 education: _education.text.trim(),
                 healthStatus: _health.text.trim(),
                 admissionDate: _admissionDate,
-                guardianDetails: _guardian.text.trim().isEmpty ? null : _guardian.text.trim(),
+                guardianDetails: _guardian.text.trim().isEmpty
+                    ? null
+                    : _guardian.text.trim(),
+                dob: _dob,
+                schoolClass: _classCtrl.text.trim().isEmpty
+                    ? null
+                    : int.parse(_classCtrl.text.trim()),
+                section: _section.text.trim().isEmpty
+                    ? null
+                    : _section.text.trim(),
+                schoolName: _schoolName.text.trim().isEmpty
+                    ? null
+                    : _schoolName.text.trim(),
               ),
             );
           },
           child: const Text('Save'),
-        )
+        ),
       ],
     );
   }
 
-  String? _required(String? value) => (value == null || value.trim().isEmpty) ? 'Required' : null;
+  String? _required(String? value) =>
+      (value == null || value.trim().isEmpty) ? 'Required' : null;
 }

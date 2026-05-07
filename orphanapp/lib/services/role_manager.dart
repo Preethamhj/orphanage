@@ -26,6 +26,8 @@ class RoleManager {
 
   bool canViewChildren() => true;
   bool canModifyChildren() => isAdmin;
+  bool canModifyAcademic() => isAdmin || isStaff;
+  bool canManageSkills() => isAdmin || isStaff;
 
   bool canViewStaff() => true;
   bool canModifyStaff() => isAdmin;
@@ -44,12 +46,18 @@ class RoleManager {
         return isAdmin;
       case '/children':
         return canViewChildren();
+      case '/grouping':
+        return isAdmin || isStaff;
       case '/staff':
         return canViewStaff();
       case '/donations':
         return canAccessDonations();
       case '/adoptions':
         return canAccessAdoptions();
+      case '/student-categories':
+        return isAdmin || isStaff;
+      case '/skills-management':
+        return isAdmin || isStaff;
       case '/donor-home':
         return isDonor;
       case '/adopter-home':
