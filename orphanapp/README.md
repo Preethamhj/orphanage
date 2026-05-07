@@ -102,11 +102,18 @@ Access:
 
 ### Donor
 Intent:
-- Donor-side visibility and navigation.
+- Donor-side profile completion and donation submission.
 
 Access:
-- Donor home overview
-- Restricted financial/module controls per role policies
+- Donor dashboard
+- Save donor information:
+  - Name
+  - Email
+  - Contact number
+  - Work / occupation
+  - Monthly salary
+- Submit donations after profile details are saved
+- Restricted admin donation-management controls remain admin-only
 
 ### Adopter
 Intent:
@@ -138,6 +145,17 @@ Access:
 - Date filters
 - Total amount summary
 
+## Donor Dashboard
+- Shows donor profile information for the logged-in donor.
+- New donors must save work/occupation and monthly salary once.
+- After profile completion, donors can submit a donation form.
+- Donation form supports:
+  - Cash
+  - Food
+  - Clothes
+  - Others
+- Donor-submitted donations are inserted into `public.donars`.
+
 ## Adoption Management
 - List adoptions
 - Add adoption/apply
@@ -154,6 +172,14 @@ Access:
 - Quick links
 - Recent login feed
 - Pending user approvals (admin action)
+- Student intelligence shows academic and age distributions.
+- Skill data is managed separately from the dashboard.
+
+## Student Skills
+- Dedicated drawer page: `Student Skills`
+- Route: `/skills-management`
+- Shows each student skill entry.
+- Admin/staff can add, edit, and delete student skills.
 
 ## Role Home Dashboards (staff/donor/adopter)
 - Banner image
@@ -171,11 +197,14 @@ Core tables:
 - `public.login_logs`
 - `public.children`
 - `public.staff`
+- `public.donars` (current donation module query target)
 - `public.donations` (exists in schema)
 - `public.adoptions`
 - `public.admin_users`
 - `public.donors`
 - `public.adopters`
+- `public.academic_records`
+- `public.child_skills`
 
 Auth table:
 - `auth.users` (managed by Supabase Auth)
@@ -188,6 +217,40 @@ RLS:
 - Enabled across key tables.
 - Policies allow authenticated access according to project rules.
 - Admin update policy exists on `public.users`.
+
+### Required Donor SQL
+The donor dashboard expects these extra columns on `public.donors`:
+
+```sql
+alter table public.donors
+add column if not exists occupation text;
+
+alter table public.donors
+add column if not exists monthly_salary numeric(12,2);
+```
+
+The donor donation form writes to `public.donars`:
+
+```sql
+create table if not exists public.donars (
+  donation_id bigint generated always as identity primary key,
+  donor_name text not null,
+  donation_type text not null check (donation_type in ('cash','clothes','food','others')),
+  donation_amount numeric(12,2) not null default 0,
+  payment_method text not null,
+  donation_date date not null,
+  remarks text,
+  updated_at timestamptz default now()
+);
+
+alter table public.donars enable row level security;
+
+drop policy if exists donars_auth_all on public.donars;
+create policy donars_auth_all on public.donars
+for all to authenticated
+using (true)
+with check (true);
+```
 
 ---
 
@@ -222,6 +285,7 @@ Implemented:
 - SafeArea + Scroll views for overflow handling
 - Drawer navigation with logo branding
 - Dashboard image banner
+- Dedicated student skills drawer page
 - Material cards/forms/lists
 - Loading indicators and snackbar messages
 - Back navigation control on dashboard exit flow
@@ -259,6 +323,8 @@ Backend services:
 - Role strings must be lowercase:
   - `admin`, `staff`, `donor`, `adopter`
 - Donation module currently queries table `donars`. Keep table name consistent in Supabase.
+- Donor dashboard requires `occupation` and `monthly_salary` columns in `public.donors`.
+- Donor-submitted donations are stored in `public.donars`.
 
 ---
 
@@ -270,4 +336,6 @@ Backend services:
 4. Run app with dart-defines.
 5. Register sample users.
 6. Approve users from admin dashboard.
-7. Verify role-specific navigation and module access.
+7. For donor users, save occupation and monthly salary on first donor dashboard visit.
+8. Verify donor donation submission writes into `public.donars`.
+9. Verify role-specific navigation and module access.
